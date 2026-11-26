@@ -36,6 +36,11 @@ red-team work against **your own** sessions and lab targets.
 - **Save captures** — snapshot any tab's cookies into
   `chrome.storage.local` and manage them in the **Saved** view: reopen
   in the table, copy as JSON, or delete. Survives restarts.
+- **Import** — paste a Netscape `.txt`, a cURL command, a `Cookie:`
+  header, or JSON to inject cookies into the current tab's host via
+  `chrome.cookies.set` (auto-detected format).
+- **Library backup** — `⇩ all` / `⇧ all` in the Saved view export or
+  merge-import every saved capture as a single JSON file.
 - **Diagnostics** — when a page shows no cookies, the popup prints the
   raw per-query results so you can see exactly what the API returned.
 

@@ -401,4 +401,179 @@ $("saved-list").addEventListener("click", async (e) => {
         renderSaved();
     }
 });
+const SAME_SITE_VALUES = new Set(["no_restriction", "lax", "strict", "unspecified"]);
+function toSameSite(v) {
+    return typeof v === "string" && SAME_SITE_VALUES.has(v)
+        ? v
+        : undefined;
+}
+// Normalizes one parsed cookie-ish object into a SetDetails spec.
+function toSetSpec(raw, fallbackUrl) {
+    const name = String(raw.name ?? "").trim();
+    const value = String(raw.value ?? "");
+    if (!name)
+        return null;
+    const domain = typeof raw.domain === "string" && raw.domain ? raw.domain : undefined;
+    const url = domain
+        ? `${fallbackUrl.startsWith("https") ? "https" : "http"}://${domain.replace(/^\./, "")}/`
+        : fallbackUrl;
+    return {
+        url,
+        name,
+        value,
+        domain,
+        path: typeof raw.path === "string" && raw.path ? raw.path : undefined,
+        secure: typeof raw.secure === "boolean" ? raw.secure : undefined,
+        httpOnly: typeof raw.httpOnly === "boolean" ? raw.httpOnly : undefined,
+        expirationDate: typeof raw.expirationDate === "number" && raw.expirationDate > 0
+            ? raw.expirationDate
+            : undefined,
+        sameSite: toSameSite(raw.sameSite),
+    };
+}
+function parseCookiePairs(pairs, fallbackUrl) {
+    const out = [];
+    for (const pair of pairs.split(";").map((s) => s.trim()).filter(Boolean)) {
+        const eq = pair.indexOf("=");
+        if (eq < 1)
+            continue;
+        const spec = toSetSpec({ name: pair.slice(0, eq).trim(), value: pair.slice(eq + 1).trim() }, fallbackUrl);
+        if (spec)
+            out.push(spec);
+    }
+    return out;
+}
+// Detects format: JSON export, Netscape .txt, cURL command, or a bare
+// "a=b; c=d" Cookie header. Returns null when nothing parses.
+function parseImport(text, fallbackUrl) {
+    const t = text.trim();
+    if (!t)
+        return null;
+    // JSON (our export shape, a bare array, or {cookies:[...]})
+    if (t.startsWith("[") || t.startsWith("{")) {
+        try {
+            const data = JSON.parse(t);
+            const arr = Array.isArray(data)
+                ? data
+                : Array.isArray(data.cookies)
+                    ? (data.cookies)
+                    : Array.isArray(data.captures)
+                        ? data.captures.flatMap((c) => c.cookies ?? [])
+                        : null;
+            if (arr) {
+                const specs = arr
+                    .map((c) => toSetSpec(c, fallbackUrl))
+                    .filter((s) => s !== null);
+                return specs.length ? specs : null;
+            }
+        }
+        catch { /* not JSON — fall through */ }
+    }
+    // Netscape cookie file: tab-separated lines, comments start with #
+    const netscapeLines = t
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l && !l.startsWith("#") && l.includes("\t"));
+    if (netscapeLines.length && netscapeLines.every((l) => l.split("\t").length >= 7)) {
+        const specs = [];
+        for (const line of netscapeLines) {
+            const [domain, , path, secureFlag, expires, name, ...rest] = line.split("\t");
+            const spec = toSetSpec({
+                name,
+                value: rest.join("\t"),
+                domain,
+                path,
+                secure: secureFlag.toUpperCase() === "TRUE",
+                expirationDate: Number(expires) > 0 ? Number(expires) : undefined,
+            }, fallbackUrl);
+            if (spec)
+                specs.push(spec);
+        }
+        return specs.length ? specs : null;
+    }
+    // cURL command or bare Cookie header — pull the "Cookie: ..." value
+    const headerMatch = t.match(/Cookie:\s*'([^']+)'/i) ||
+        t.match(/Cookie:\s*"([^"]+)"/i) ||
+        t.match(/Cookie:\s*([^\n]+)/i);
+    const pairs = headerMatch?.[1] ?? t;
+    const specs = parseCookiePairs(pairs, fallbackUrl);
+    return specs.length ? specs : null;
+}
+function showImportModal(show) {
+    $("import-modal").hidden = !show;
+    if (show) {
+        $("import-status").textContent = "";
+        $("import-text").focus();
+    }
+}
+$("import").addEventListener("click", () => showImportModal(true));
+$("import-cancel").addEventListener("click", () => showImportModal(false));
+$("import-go").addEventListener("click", async () => {
+    const status = $("import-status");
+    const specs = parseImport($("import-text").value, pageUrl || "https://localhost/");
+    if (!specs) {
+        status.textContent = "Nothing recognized — try Netscape, cURL, header, or JSON.";
+        return;
+    }
+    let ok = 0;
+    let fail = 0;
+    for (const spec of specs) {
+        try {
+            await chrome.cookies.set(spec);
+            ok++;
+        }
+        catch {
+            fail++;
+        }
+    }
+    status.textContent = `imported ${ok}${fail ? `, ${fail} failed` : ""}`;
+    if (ok > 0) {
+        showImportModal(false);
+        load();
+    }
+});
+// ---- library export / import -------------------------------------------------
+$("lib-export").addEventListener("click", async () => {
+    const list = await getCaptures();
+    const payload = { version: 1, exportedAt: Date.now(), captures: list };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `cookie-capture-library-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+});
+$("lib-import").addEventListener("click", () => $("lib-file").click());
+$("lib-file").addEventListener("change", async (e) => {
+    const input = e.target;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file)
+        return;
+    try {
+        const data = JSON.parse(await file.text());
+        const incoming = Array.isArray(data) ? data : data.captures;
+        if (!Array.isArray(incoming))
+            throw new Error("bad format");
+        const existing = await getCaptures();
+        const ids = new Set(existing.map((c) => c.id));
+        const merged = [...existing];
+        for (const cap of incoming) {
+            if (!cap || typeof cap.name !== "string" || !Array.isArray(cap.cookies))
+                continue;
+            const copy = {
+                ...cap,
+                id: ids.has(cap.id) ? crypto.randomUUID() : cap.id,
+                cookies: cap.cookies,
+            };
+            ids.add(copy.id);
+            merged.push(copy);
+        }
+        await setCaptures(merged);
+        renderSaved();
+    }
+    catch {
+        alert("Could not import library file — expected the JSON exported by ⇩ all.");
+    }
+});
 load();

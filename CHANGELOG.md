@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.0 — 2026-11-26
+
+### Added
+
+- **Import** button: paste a Netscape `.txt` cookie file, a cURL
+  command, a bare `Cookie:` header, or JSON (bare array, `{cookies}`,
+  or `{captures}` export) — format auto-detected, cookies injected via
+  `chrome.cookies.set` on the current tab's host, then the list reloads
+- **Library backup**: `⇩ all` in the Saved view downloads every saved
+  capture as one JSON file; `⇧ all` re-imports it (merges, dedupes by id)
+
 ## 1.2.0 — 2026-11-26
 
 ### Added

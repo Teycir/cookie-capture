@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Cookie Capture</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <span class="brand">🍪 Cookie Capture</span>
+    <span id="page-info" class="page-info">…</span>
+    <span class="spacer"></span>
+    <div class="views">
+      <button id="tab-current" class="view-tab active">Current</button>
+      <button id="tab-saved" class="view-tab">Saved <span id="saved-count"></span></button>
+    </div>
+  </header>
+
+  <div id="pane-current">
+    <div class="toolbar">
+      <input id="filter" type="search" placeholder="Filter name, domain, value…" autocomplete="off" />
+      <span id="count" class="count"></span>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="col-idx">#</th>
+            <th>Name</th>
+            <th>Domain</th>
+            <th>Path</th>
+            <th>Expires</th>
+            <th>Flags</th>
+            <th class="col-actions"></th>
+          </tr>
+        </thead>
+        <tbody id="cookies"></tbody>
+      </table>
+      <div id="empty" class="empty" hidden>No cookies on this page.</div>
+      <div id="error" class="error" hidden></div>
+    </div>
+
+    <footer>
+      <select id="format">
+        <option value="json">JSON</option>
+        <option value="netscape">Netscape .txt</option>
+        <option value="curl">cURL header</option>
+      </select>
+      <label class="toggle">
+        <input type="checkbox" id="show-values" checked /> values
+      </label>
+      <span class="spacer"></span>
+      <button id="import">Import</button>
+      <button id="save">Save</button>
+      <button id="copy">Copy</button>
+      <button id="download">Download</button>
+    </footer>
+    <div class="hint" id="hint">stays local — never sent anywhere</div>
+  </div>
+
+  <div id="pane-saved" hidden>
+    <div class="saved-head">
+      Saved captures — stored locally in the extension
+      <span class="spacer"></span>
+      <button id="lib-export" class="mini-btn" title="Download all captures as JSON">⇩ all</button>
+      <button id="lib-import" class="mini-btn" title="Import captures from JSON">⇧ all</button>
+      <input type="file" id="lib-file" accept=".json,application/json" hidden />
+    </div>
+    <ul id="saved-list" class="saved-list"></ul>
+    <div id="saved-empty" class="empty" hidden>No saved captures yet — use Save on the Current tab.</div>
+  </div>
+
+  <div id="import-modal" class="modal" hidden>
+    <div class="modal-box">
+      <div class="modal-title">Import cookies</div>
+      <textarea id="import-text" spellcheck="false"
+        placeholder="Paste Netscape .txt, a cURL command, a Cookie: header, or JSON…"></textarea>
+      <div class="modal-actions">
+        <button id="import-go">Import</button>
+        <button id="import-cancel">Cancel</button>
+        <span id="import-status" class="modal-status"></span>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
