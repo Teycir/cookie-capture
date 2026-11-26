@@ -95,13 +95,25 @@ curl 'https://app.example.com/api/me' \
 app.example.com	FALSE	/	FALSE	0	theme	dark
 ```
 
+## Develop
+
+Source is TypeScript (`popup.ts`); `popup.js` is the compiled artifact
+Chrome loads — it's committed so the extension works without a build.
+
+```bash
+npm install     # typescript + @types/chrome (dev only)
+npm run build   # tsc -> popup.js
+npm run typecheck
+```
+
 ## Files
 
 ```
 manifest.json   MV3 manifest
 popup.html      popup UI
 popup.css       dark theme styles
-popup.js        capture + export + row actions
+popup.ts        capture + export + row actions (source)
+popup.js        compiled output loaded by Chrome
 icons/          16/32/48/128 px PNG icons
 dist/           versioned zip + extracted folder
 CHANGELOG.md    release notes
