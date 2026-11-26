@@ -372,6 +372,12 @@ $("save").addEventListener("click", async () => {
 async function renderSaved() {
     const list = await getCaptures();
     $("saved-count").textContent = list.length ? `(${list.length})` : "";
+    // Nothing saved — bounce back to the Current view instead of showing
+    // a blank Saved pane.
+    if (list.length === 0 && !$("pane-saved").hidden) {
+        showView("current");
+        return;
+    }
     $("saved-empty").hidden = list.length > 0;
     $("saved-list").innerHTML = list
         .map((c) => `<li class="saved-item" data-id="${c.id}">
