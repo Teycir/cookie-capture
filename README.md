@@ -131,7 +131,12 @@ CHANGELOG.md    release notes
 
 ## License
 
-[MIT](LICENSE) — Copyright (c) 2026 Teycir — teycir@pxdmail.net
+[MIT](LICENSE) — Copyright (c) 2026 Teycir
+
+## Contact
+
+Teycir
+teycir@pxdmail.net
 
 ## Legal note
 
