@@ -293,6 +293,11 @@ td.actions { white-space: nowrap; }
 }
 .mini-btn:hover { border-color: var(--accent); color: var(--text); }
 .mini-btn.danger:hover { border-color: #c05b5b; color: #ff9d9d; }
+.mini-btn.armed {
+  border-color: #c05b5b;
+  color: #ff9d9d;
+  font-size: 9px;
+}
 
 /* empty / error states */
 .empty, .error {

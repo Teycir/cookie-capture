@@ -207,6 +207,33 @@ function flash(el) {
     el.style.outline = "1px solid var(--accent)";
     setTimeout(() => (el.style.outline = ""), 400);
 }
+// Two-step delete: first click arms the button ("sure?"), second click
+// within 3s runs the action. Avoids window.confirm(), which renders as a
+// dead dark dialog inside extension popups.
+let armedDelete = null;
+function disarmDelete() {
+    if (armedDelete)
+        clearTimeout(armedDelete.timer);
+    armedDelete = null;
+    document.querySelectorAll(".mini-btn.armed").forEach((b) => {
+        b.textContent = "×";
+        b.classList.remove("armed");
+    });
+}
+function armDelete(key, btn, run) {
+    if (armedDelete?.key === key) {
+        disarmDelete();
+        run();
+        return;
+    }
+    disarmDelete();
+    armedDelete = {
+        key,
+        timer: setTimeout(disarmDelete, 3000),
+    };
+    btn.textContent = "sure?";
+    btn.classList.add("armed");
+}
 listEl.addEventListener("click", async (e) => {
     const target = e.target;
     const btn = target?.closest("button[data-act]");
@@ -218,21 +245,21 @@ listEl.addEventListener("click", async (e) => {
         return;
     const act = btn?.getAttribute("data-act");
     if (act === "del") {
-        if (!confirm(`Delete cookie "${c.name}" on ${c.domain}?`))
-            return;
-        try {
-            await chrome.cookies.remove({
-                url: pageUrl,
-                name: c.name,
-                storeId: c.storeId,
-                partitionKey: c.partitionKey,
-            });
-            load();
-        }
-        catch (err) {
-            $("error").hidden = false;
-            $("error").textContent = `Delete failed: ${err instanceof Error ? err.message : String(err)}`;
-        }
+        armDelete(`cookie:${c.name}:${c.domain}`, btn, async () => {
+            try {
+                await chrome.cookies.remove({
+                    url: pageUrl,
+                    name: c.name,
+                    storeId: c.storeId,
+                    partitionKey: c.partitionKey,
+                });
+                load();
+            }
+            catch (err) {
+                $("error").hidden = false;
+                $("error").textContent = `Delete failed: ${err instanceof Error ? err.message : String(err)}`;
+            }
+        });
         return;
     }
     const text = act === "value" ? c.value : `${c.name}=${c.value}`;
@@ -395,10 +422,10 @@ $("saved-list").addEventListener("click", async (e) => {
         }
     }
     else if (act === "del") {
-        if (!confirm(`Delete saved capture "${cap.name}"?`))
-            return;
-        await setCaptures(list.filter((c) => c.id !== id));
-        renderSaved();
+        armDelete(`saved:${id}`, btnEl, async () => {
+            await setCaptures(list.filter((c) => c.id !== id));
+            renderSaved();
+        });
     }
 });
 const SAME_SITE_VALUES = new Set(["no_restriction", "lax", "strict", "unspecified"]);

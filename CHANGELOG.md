@@ -11,6 +11,14 @@
 - **Library backup**: `⇩ all` in the Saved view downloads every saved
   capture as one JSON file; `⇧ all` re-imports it (merges, dedupes by id)
 
+### Fixed
+
+- Replaced native `confirm()` dialogs (which render as a dead dark
+  popup in extension popups) with an inline two-step `sure?` button on
+  both cookie-row and saved-capture deletes — click again within 3s to
+  confirm, click elsewhere or wait to cancel
+- Version badge in the popup header (`v1.3.0`), read from the manifest
+
 ## 1.2.0 — 2026-11-26
 
 ### Added

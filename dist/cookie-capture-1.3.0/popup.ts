@@ -250,6 +250,35 @@ function flash(el: Element): void {
   setTimeout(() => ((el as HTMLElement).style.outline = ""), 400);
 }
 
+// Two-step delete: first click arms the button ("sure?"), second click
+// within 3s runs the action. Avoids window.confirm(), which renders as a
+// dead dark dialog inside extension popups.
+let armedDelete: { key: string; timer: ReturnType<typeof setTimeout> } | null = null;
+
+function disarmDelete(): void {
+  if (armedDelete) clearTimeout(armedDelete.timer);
+  armedDelete = null;
+  document.querySelectorAll(".mini-btn.armed").forEach((b) => {
+    (b as HTMLElement).textContent = "×";
+    b.classList.remove("armed");
+  });
+}
+
+function armDelete(key: string, btn: HTMLElement, run: () => void): void {
+  if (armedDelete?.key === key) {
+    disarmDelete();
+    run();
+    return;
+  }
+  disarmDelete();
+  armedDelete = {
+    key,
+    timer: setTimeout(disarmDelete, 3000),
+  };
+  btn.textContent = "sure?";
+  btn.classList.add("armed");
+}
+
 listEl.addEventListener("click", async (e: Event) => {
   const target = e.target as HTMLElement | null;
   const btn = target?.closest("button[data-act]");
@@ -260,19 +289,20 @@ listEl.addEventListener("click", async (e: Event) => {
 
   const act = btn?.getAttribute("data-act");
   if (act === "del") {
-    if (!confirm(`Delete cookie "${c.name}" on ${c.domain}?`)) return;
-    try {
-      await chrome.cookies.remove({
-        url: pageUrl,
-        name: c.name,
-        storeId: c.storeId,
-        partitionKey: c.partitionKey,
-      });
-      load();
-    } catch (err) {
-      $("error").hidden = false;
-      $("error").textContent = `Delete failed: ${err instanceof Error ? err.message : String(err)}`;
-    }
+    armDelete(`cookie:${c.name}:${c.domain}`, btn as HTMLElement, async () => {
+      try {
+        await chrome.cookies.remove({
+          url: pageUrl,
+          name: c.name,
+          storeId: c.storeId,
+          partitionKey: c.partitionKey,
+        });
+        load();
+      } catch (err) {
+        $("error").hidden = false;
+        $("error").textContent = `Delete failed: ${err instanceof Error ? err.message : String(err)}`;
+      }
+    });
     return;
   }
 
@@ -448,9 +478,10 @@ $("saved-list").addEventListener("click", async (e: Event) => {
       if (btnEl) (btnEl as HTMLElement).textContent = "failed";
     }
   } else if (act === "del") {
-    if (!confirm(`Delete saved capture "${cap.name}"?`)) return;
-    await setCaptures(list.filter((c) => c.id !== id));
-    renderSaved();
+    armDelete(`saved:${id}`, btnEl as HTMLElement, async () => {
+      await setCaptures(list.filter((c) => c.id !== id));
+      renderSaved();
+    });
   }
 });
 
@@ -646,5 +677,7 @@ $("lib-file").addEventListener("change", async (e: Event) => {
     alert("Could not import library file — expected the JSON exported by ⇩ all.");
   }
 });
+
+($("version") as HTMLElement).textContent = `v${chrome.runtime.getManifest().version}`;
 
 load();
