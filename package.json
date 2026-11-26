@@ -1,6 +1,6 @@
 {
   "name": "cookie-capture",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "MV3 Chromium extension: capture, inspect, copy and export the current tab's cookies",
   "scripts": {

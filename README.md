@@ -33,14 +33,18 @@ red-team work against **your own** sessions and lab targets.
   - **cURL header** — `curl '<url>' -H 'Cookie: …'` snippet
 - **Copy to clipboard or download** as a file; footer shows cookie count
   and payload size.
+- **Save captures** — snapshot any tab's cookies into
+  `chrome.storage.local` and manage them in the **Saved** view: reopen
+  in the table, copy as JSON, or delete. Survives restarts.
 - **Diagnostics** — when a page shows no cookies, the popup prints the
   raw per-query results so you can see exactly what the API returned.
 
 ## Privacy
 
 **Everything stays local.** No `host_permissions` (temporary `activeTab`
-grant only, on click), no `storage`, no `webRequest`, no remote code,
-no network requests. Source is ~250 lines you can read in a minute.
+grant only, on click), no `webRequest`, no remote code, no network
+requests. `chrome.storage.local` is used only to persist saved captures
+on your machine. Source is ~350 lines you can read in a minute.
 
 ## Install (load unpacked)
 
@@ -72,6 +76,7 @@ chromium --load-extension=/home/teycir/Repos/cookie-capture
 | `cookies` | Read/remove cookie store entries for the current URL (incl. `HttpOnly`) |
 | `tabs` / `activeTab` | Identify the active tab and its URL; `activeTab` grants temporary host access only when you click the icon |
 | `scripting` | Read `document.cookie` inside the tab as a fallback when the cookie store is unreachable (partitioned store, wrong profile view) — misses `HttpOnly`, which `cookies` still covers |
+| `storage` | Persist saved cookie captures in `chrome.storage.local` (local only, ~10 MB quota) |
 
 ## Usage
 

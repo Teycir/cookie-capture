@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.0 — 2026-11-26
+
+### Added
+
+- **Save** button: snapshot the current tab's cookies into
+  `chrome.storage.local` with an auto-suggested name
+- **Saved view**: library of saved captures — open into the table,
+  copy as JSON, or delete; badge shows capture count
+- `storage` permission (local persistence only, still no network)
+
 ## 1.1.0 — 2026-11-26
 
 ### Added

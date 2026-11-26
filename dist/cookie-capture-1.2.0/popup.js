@@ -299,4 +299,94 @@ $("download").addEventListener("click", () => {
 });
 filterEl.addEventListener("input", render);
 showValuesEl.addEventListener("change", render);
+// ---- saved captures (chrome.storage.local) ---------------------------------
+const STORE_KEY = "captures";
+async function getCaptures() {
+    const data = await chrome.storage.local.get(STORE_KEY);
+    return data[STORE_KEY] || [];
+}
+async function setCaptures(list) {
+    await chrome.storage.local.set({ [STORE_KEY]: list });
+}
+function showView(which) {
+    const isCurrent = which === "current";
+    $("pane-current").hidden = !isCurrent;
+    $("pane-saved").hidden = isCurrent;
+    $("tab-current").classList.toggle("active", isCurrent);
+    $("tab-saved").classList.toggle("active", !isCurrent);
+    if (!isCurrent)
+        renderSaved();
+}
+$("tab-current").addEventListener("click", () => showView("current"));
+$("tab-saved").addEventListener("click", () => showView("saved"));
+$("save").addEventListener("click", async () => {
+    if (!pageUrl || cookies.length === 0)
+        return;
+    const host = new URL(pageUrl).hostname;
+    const defaultName = `${host} — ${new Date().toLocaleString()}`;
+    const name = prompt("Name this capture:", defaultName);
+    if (name === null)
+        return;
+    const capture = {
+        id: crypto.randomUUID(),
+        name: name || defaultName,
+        url: pageUrl,
+        host,
+        savedAt: Date.now(),
+        cookies: cookies.map((c) => ({ ...c })),
+    };
+    const list = await getCaptures();
+    list.unshift(capture);
+    await setCaptures(list);
+    $("saved-count").textContent = `(${list.length})`;
+    flash($("save"));
+});
+async function renderSaved() {
+    const list = await getCaptures();
+    $("saved-count").textContent = list.length ? `(${list.length})` : "";
+    $("saved-empty").hidden = list.length > 0;
+    $("saved-list").innerHTML = list
+        .map((c) => `<li class="saved-item" data-id="${c.id}">
+        <div class="saved-info">
+          <div class="saved-name" title="${escapeHtml(c.name)}">${escapeHtml(c.name)}</div>
+          <div class="saved-meta">${escapeHtml(c.host)} · ${c.cookies.length} cookies · ${new Date(c.savedAt).toLocaleString()}</div>
+        </div>
+        <button class="mini-btn" data-act="load" title="Load into table">open</button>
+        <button class="mini-btn" data-act="export" title="Copy cookies as JSON">json</button>
+        <button class="mini-btn danger" data-act="del" title="Delete saved capture">×</button>
+      </li>`)
+        .join("");
+}
+$("saved-list").addEventListener("click", async (e) => {
+    const target = e.target;
+    const li = target?.closest(".saved-item");
+    if (!li)
+        return;
+    const id = li.dataset.id;
+    const act = target?.closest("button")?.getAttribute("data-act");
+    const list = await getCaptures();
+    const cap = list.find((c) => c.id === id);
+    if (!cap) {
+        renderSaved();
+        return;
+    }
+    if (act === "load") {
+        cookies = cap.cookies.map((c) => ({ ...c }));
+        queryReport = [];
+        pageUrl = cap.url;
+        $("page-info").textContent = `${cap.name} — ${cap.host}`;
+        filterEl.value = "";
+        render();
+        showView("current");
+    }
+    else if (act === "export") {
+        await navigator.clipboard.writeText(JSON.stringify(cap.cookies, null, 2));
+    }
+    else if (act === "del") {
+        if (!confirm(`Delete saved capture "${cap.name}"?`))
+            return;
+        await setCaptures(list.filter((c) => c.id !== id));
+        renderSaved();
+    }
+});
 load();
