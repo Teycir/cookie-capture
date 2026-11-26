@@ -18,6 +18,8 @@
   both cookie-row and saved-capture deletes — click again within 3s to
   confirm, click elsewhere or wait to cancel
 - Version badge in the popup header (`v1.3.0`), read from the manifest
+- Saved view gets a `← Home` button and auto-returns to the Current
+  view whenever the library is empty (no more blank pane)
 
 ## 1.2.0 — 2026-11-26
 
