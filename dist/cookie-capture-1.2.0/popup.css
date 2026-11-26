@@ -71,7 +71,7 @@ header {
   flex-direction: column;
   overflow-y: auto;
 }
-#pane-saved[hidden] { display: none; }
+#pane-saved[hidden], #pane-current[hidden] { display: none; }
 
 .saved-head {
   padding: 8px 12px;
