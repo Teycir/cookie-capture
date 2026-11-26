@@ -576,4 +576,5 @@ $("lib-file").addEventListener("change", async (e) => {
         alert("Could not import library file — expected the JSON exported by ⇩ all.");
     }
 });
+$("version").textContent = `v${chrome.runtime.getManifest().version}`;
 load();

@@ -647,4 +647,6 @@ $("lib-file").addEventListener("change", async (e: Event) => {
   }
 });
 
+($("version") as HTMLElement).textContent = `v${chrome.runtime.getManifest().version}`;
+
 load();
