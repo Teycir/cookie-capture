@@ -364,6 +364,7 @@ $("saved-list").addEventListener("click", async (e) => {
         return;
     const id = li.dataset.id;
     const act = target?.closest("button")?.getAttribute("data-act");
+    const btnEl = target?.closest("button");
     const list = await getCaptures();
     const cap = list.find((c) => c.id === id);
     if (!cap) {
@@ -380,7 +381,18 @@ $("saved-list").addEventListener("click", async (e) => {
         showView("current");
     }
     else if (act === "export") {
-        await navigator.clipboard.writeText(JSON.stringify(cap.cookies, null, 2));
+        try {
+            await navigator.clipboard.writeText(JSON.stringify(cap.cookies, null, 2));
+            if (btnEl) {
+                btnEl.textContent = "copied";
+                setTimeout(() => (btnEl.textContent = "json"), 1200);
+                flash(btnEl);
+            }
+        }
+        catch {
+            if (btnEl)
+                btnEl.textContent = "failed";
+        }
     }
     else if (act === "del") {
         if (!confirm(`Delete saved capture "${cap.name}"?`))
