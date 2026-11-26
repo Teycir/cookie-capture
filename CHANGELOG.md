@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.1.0 — 2026-11-26
+
+### Added
+
+- Per-row actions: `a=b` copies `name=value`, `val` copies the value
+  only, `×` deletes the cookie (confirmed; API-owned cookies only)
+- `JS` badge on cookies captured via the `document.cookie` fallback
+- Relative expiry column (`in 14d`, `Session`, `Expired`)
+- Footer stats: cookie count and payload size
+- Empty-state diagnostics: raw per-query API results when no cookies
+  are found
+- TypeScript source (`popup.ts`, strict mode) compiled to `popup.js`;
+  `npm run build` / `npm run typecheck`
+
+### Changed
+
+- Two-row table layout: meta row + full-width scrollable value row —
+  long JWTs no longer force horizontal scrolling
+- CHIPS-aware partition queries across candidate top-level sites
+- Capture pipeline split into `cookieQueries` / `queryCookiesApi` /
+  `readPageCookies` helpers; export buttons guarded before first load
+
 ## 1.0.0 — 2026-11-26
 
 Initial release.
