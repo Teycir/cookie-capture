@@ -8,6 +8,8 @@ a ready-to-paste `cURL` command.
 Built for quick session debugging, API testing with `curl`, and
 red-team work against **your own** sessions and lab targets.
 
+![Cookie Capture — Saved captures view](docs/screenshot-1.png)
+
 ## Features
 
 - **Two-source capture** — reads via `chrome.cookies` (gets `HttpOnly`
