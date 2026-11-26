@@ -404,6 +404,7 @@ function showView(which: "current" | "saved"): void {
 
 $("tab-current").addEventListener("click", () => showView("current"));
 $("tab-saved").addEventListener("click", () => showView("saved"));
+$("btn-home").addEventListener("click", () => showView("current"));
 
 $("save").addEventListener("click", async () => {
   if (!pageUrl || cookies.length === 0) return;
