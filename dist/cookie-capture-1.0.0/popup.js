@@ -18,6 +18,72 @@ function escapeHtml(s) {
   );
 }
 
+// chrome.cookies.getAll({url}) returns unpartitioned cookies only.
+// CHIPS-partitioned cookies need an explicit partitionKey whose
+// topLevelSite is scheme + registrable domain — try the origin and
+// every parent domain (app.grayswan.ai -> grayswan.ai).
+function cookieQueries(u) {
+  const queries = [{ url: u.href }];
+  const labels = u.hostname.split(".");
+  for (let i = 0; i < labels.length - 1; i++) {
+    queries.push({
+      url: u.href,
+      partitionKey: { topLevelSite: `${u.protocol}//${labels.slice(i).join(".")}` },
+    });
+  }
+  return queries;
+}
+
+// Runs every query variant, returns cookie lists + a diagnostic report.
+async function queryCookiesApi(u) {
+  const settled = await Promise.all(
+    cookieQueries(u).map(async (q) => {
+      const label = q.partitionKey ? q.partitionKey.topLevelSite : "unpartitioned";
+      try {
+        return { label, list: await chrome.cookies.getAll(q), err: null };
+      } catch (e) {
+        return { label, list: [], err: e.message };
+      }
+    }),
+  );
+  // global count: every cookie this extension context can see at all
+  let globalCount;
+  try { globalCount = (await chrome.cookies.getAll({})).length; }
+  catch (e) { globalCount = "ERR " + e.message; }
+  const report = settled
+    .map((s) => `${s.label}: ${s.err ? "ERR " + s.err : s.list.length}`)
+    .concat([`ALL cookies visible: ${globalCount}`]);
+  return { settled, report };
+}
+
+// document.cookie inside the page — catches cookies the extension's
+// cookie store can't see (partitioned store, wrong profile view).
+// Misses HttpOnly cookies; those only come via chrome.cookies.
+async function readPageCookies(tab, u) {
+  const [res] = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: () => document.cookie,
+  });
+  const raw = res?.result || "";
+  const out = [];
+  for (const pair of raw.split(";").map((s) => s.trim()).filter(Boolean)) {
+    const eq = pair.indexOf("=");
+    if (eq < 1) continue;
+    out.push({
+      name: pair.slice(0, eq),
+      value: pair.slice(eq + 1),
+      domain: u.hostname,
+      path: "/",
+      secure: u.protocol === "https:",
+      httpOnly: false,
+      session: true,
+      sameSite: "unspecified",
+      _viaPage: true,
+    });
+  }
+  return out;
+}
+
 async function load() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -28,86 +94,29 @@ async function load() {
       return;
     }
     pageUrl = tab.url;
-    const host = new URL(tab.url).hostname;
-    $("page-info").textContent = `${tab.title || host} — ${host}`;
+    const u = new URL(tab.url);
+    $("page-info").textContent = `${tab.title || u.hostname} — ${u.hostname}`;
 
-    // chrome.cookies.getAll({url}) returns unpartitioned cookies only.
-    // CHIPS-partitioned cookies need an explicit partitionKey whose
-    // topLevelSite is scheme + registrable domain — try the origin and
-    // every parent domain (app.grayswan.ai -> grayswan.ai).
-    const queries = [{ url: tab.url }];
-    try {
-      const u = new URL(tab.url);
-      const labels = u.hostname.split(".");
-      for (let i = 0; i < labels.length - 1; i++) {
-        queries.push({
-          url: tab.url,
-          partitionKey: { topLevelSite: `${u.protocol}//${labels.slice(i).join(".")}` },
-        });
-      }
-    } catch { /* older Chrome without CHIPS support */ }
-    // keep per-query diagnostics so "no cookies" is explainable in-place
-    const settled = await Promise.all(
-      queries.map(async (q) => {
-        const label = q.partitionKey ? q.partitionKey.topLevelSite : "unpartitioned";
-        try {
-          const r = await chrome.cookies.getAll(q);
-          return { label, list: r, err: null };
-        } catch (e) {
-          return { label, list: [], err: e.message };
-        }
-      }),
-    );
-    // global count: every cookie this extension context can see at all
-    let globalCount = "?";
-    try { globalCount = (await chrome.cookies.getAll({})).length; }
-    catch (e) { globalCount = "ERR " + e.message; }
-    queryReport = settled
-      .map((s) => `${s.label}: ${s.err ? "ERR " + s.err : s.list.length}`)
-      .concat([`ALL cookies visible: ${globalCount}`]);
+    const { settled, report } = await queryCookiesApi(u);
+    queryReport = report;
     cookies = [
       ...new Map(
         settled.flatMap((s) => s.list)
           .map((c) => [`${c.name}|${c.domain}|${c.path}|${c.partitionKey ? 1 : 0}`, c]),
       ).values(),
     ];
-    cookies.sort((a, b) => a.name.localeCompare(b.name));
 
-    // Fallback/complement: read document.cookie in the page itself.
-    // The cookies API can see an empty store (wrong profile, partitioned
-    // store) while the page clearly has cookies — this catches those.
-    // Misses HttpOnly cookies; those only come via chrome.cookies above.
     try {
-      const [res] = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: () => document.cookie,
-      });
-      const raw = res?.result || "";
-      let added = 0;
-      for (const pair of raw.split(";").map((s) => s.trim()).filter(Boolean)) {
-        const eq = pair.indexOf("=");
-        if (eq < 1) continue;
-        const name = pair.slice(0, eq);
-        if (cookies.some((c) => c.name === name)) continue;
-        cookies.push({
-          name,
-          value: pair.slice(eq + 1),
-          domain: host,
-          path: "/",
-          secure: tab.url.startsWith("https:"),
-          httpOnly: false,
-          session: true,
-          sameSite: "unspecified",
-          partitionKey: undefined,
-          _viaPage: true,
-        });
-        added++;
-      }
-      if (queryReport.length) queryReport.push(`document.cookie pairs added: ${added}`);
-      cookies.sort((a, b) => a.name.localeCompare(b.name));
+      const pageCookies = await readPageCookies(tab, u);
+      const known = new Set(cookies.map((c) => c.name));
+      const added = pageCookies.filter((c) => !known.has(c.name));
+      cookies.push(...added);
+      queryReport.push(`document.cookie pairs added: ${added.length}`);
     } catch (e) {
-      if (queryReport.length) queryReport.push(`document.cookie: ERR ${e.message}`);
+      queryReport.push(`document.cookie: ERR ${e.message}`);
     }
+
+    cookies.sort((a, b) => a.name.localeCompare(b.name));
     render();
   } catch (err) {
     $("error").hidden = false;
@@ -155,18 +164,20 @@ function render() {
   const rows = visible();
   countEl.textContent = `${rows.length}/${cookies.length}`;
   const bytes = cookies.reduce((s, c) => s + c.name.length + c.value.length, 0);
-  document.querySelector(".hint").textContent =
+  $("hint").textContent =
     `stays local — never sent anywhere · ${cookies.length} cookies · ${(bytes / 1024).toFixed(1)} KB`;
   const emptyEl = $("empty");
   emptyEl.hidden = rows.length > 0;
   if (rows.length === 0 && queryReport.length) {
-    emptyEl.innerHTML = `No cookies on this page.<br><span class="dbg">${queryReport.join("<br>")}</span>`;
+    emptyEl.innerHTML =
+      `No cookies on this page.<br><span class="dbg">${queryReport.map(escapeHtml).join("<br>")}</span>`;
   }
 
   const show = showValuesEl.checked;
+  const indexOf = new Map(cookies.map((c, i) => [c, i]));
   listEl.innerHTML = rows
     .map((c) => {
-      const idx = cookies.indexOf(c);
+      const idx = indexOf.get(c);
       const expires = expiresText(c);
       const vtext = show ? escapeHtml(c.value) : "••••••••  ••••••••  ••••••••";
       // delete only works for cookies the cookies API returned (has storeId)
@@ -234,7 +245,6 @@ function toJSON() {
 }
 
 function toNetscape() {
-  const host = new URL(pageUrl).hostname;
   const lines = [
     "# Netscape HTTP Cookie File — captured by Cookie Capture",
     "# https://curl.se/docs/http-cookies.html",
@@ -269,12 +279,14 @@ function exportText() {
 }
 
 function filename() {
+  if (!pageUrl) return "cookies.txt";
   const host = new URL(pageUrl).hostname.replace(/[^a-z0-9.-]/gi, "_");
   const ext = { json: "json", netscape: "txt", curl: "sh" }[formatEl.value];
   return `cookies-${host}.${ext}`;
 }
 
 $("copy").addEventListener("click", async () => {
+  if (!pageUrl) return;
   const text = exportText();
   await navigator.clipboard.writeText(text);
   $("copy").textContent = "Copied!";
@@ -282,6 +294,7 @@ $("copy").addEventListener("click", async () => {
 });
 
 $("download").addEventListener("click", () => {
+  if (!pageUrl) return;
   const blob = new Blob([exportText()], { type: "text/plain" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
