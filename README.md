@@ -129,6 +129,10 @@ dist/           versioned zip + extracted folder
 CHANGELOG.md    release notes
 ```
 
+## License
+
+[MIT](LICENSE) — Copyright (c) 2026 Teycir — teycir@pxdmail.net
+
 ## Legal note
 
 Only capture cookies for systems you're authorized to test — your own

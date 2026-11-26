@@ -2,6 +2,8 @@
   "name": "cookie-capture",
   "version": "1.3.0",
   "private": true,
+  "license": "MIT",
+  "author": "Teycir <teycir@pxdmail.net>",
   "description": "MV3 Chromium extension: capture, inspect, copy and export the current tab's cookies",
   "scripts": {
     "build": "tsc",
