@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Cookie Capture — Current Tab",
+  "version": "1.0.0",
+  "description": "Capture and export cookies for the current tab: JSON, Netscape cookies.txt, or a cURL Cookie header. Local only — nothing leaves your browser.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Capture this tab's cookies"
+  },
+  "permissions": ["cookies", "activeTab", "tabs", "scripting"],
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
+}
